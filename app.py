@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """
 Web API Email Validator using Flask
-IMPORTANT: This file should NOT be named 'email_validator.py'!
+FIXED VERSION with CORS headers
 """
 
 from flask import Flask, request, jsonify
+from flask_cors import CORS  # ADD THIS LINE
 from email_validator import validate_email, EmailNotValidError
 import os
 from typing import List, Dict
 
 app = Flask(__name__)
+CORS(app)  # ADD THIS LINE - Enables CORS for all routes
 
 def validate_single_email(email):
     """
