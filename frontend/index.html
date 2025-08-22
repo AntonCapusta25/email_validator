@@ -138,6 +138,8 @@
             display: inline-flex;
             align-items: center;
             gap: 10px;
+            margin-right: 10px;
+            margin-bottom: 10px;
         }
 
         .btn:hover {
@@ -149,6 +151,10 @@
             opacity: 0.6;
             cursor: not-allowed;
             transform: none;
+        }
+
+        .btn-sample {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
         }
 
         .result {
@@ -222,7 +228,7 @@
             padding: 15px 20px;
             border-bottom: 1px solid #e1e5e9;
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: center;
             transition: background 0.2s ease;
         }
@@ -366,8 +372,8 @@
 
         <!-- Tabs -->
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('single')">Single Email</button>
-            <button class="tab" onclick="switchTab('batch')">Batch Processing</button>
+            <button class="tab active" id="single-tab-btn">Single Email</button>
+            <button class="tab" id="batch-tab-btn">Batch Processing</button>
         </div>
 
         <!-- Single Email Tab -->
@@ -380,7 +386,7 @@
                            placeholder="Enter email address to validate">
                     <div id="singleError" class="error-message"></div>
                 </div>
-                <button class="btn" onclick="validateSingle()">
+                <button class="btn" id="validateSingleBtn">
                     <span id="singleLoader" class="loading" style="display: none;"></span>
                     Validate Email
                 </button>
@@ -410,9 +416,13 @@
                     <div id="batchError" class="error-message"></div>
                 </div>
                 
-                <button class="btn" onclick="validateBatch()">
+                <button class="btn" id="validateBatchBtn">
                     <span id="batchLoader" class="loading" style="display: none;"></span>
                     Validate Batch
+                </button>
+                
+                <button class="btn btn-sample" id="loadSampleBtn">
+                    🎯 Load Sample Data
                 </button>
 
                 <div id="batchResults" class="batch-results"></div>
@@ -421,79 +431,126 @@
     </div>
 
     <script>
-        // Global variables
-        let currentApiUrl = window.location.origin || 'http://localhost:5000';
+        // Global configuration
+        let currentApiUrl = '';
 
-        // Update API URL when changed
-        const apiUrlInput = document.getElementById('apiUrl');
-        if (apiUrlInput) {
-            apiUrlInput.addEventListener('change', function() {
+        // Initialize the application
+        function initializeApp() {
+            console.log('Initializing Email Validator App...');
+            
+            // Set default API URL
+            const apiUrlInput = document.getElementById('apiUrl');
+            if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                currentApiUrl = window.location.origin;
+                apiUrlInput.value = currentApiUrl;
+            }
+
+            // Setup event listeners
+            setupEventListeners();
+            
+            console.log('App initialized successfully');
+        }
+
+        // Setup all event listeners
+        function setupEventListeners() {
+            // API URL input
+            const apiUrlInput = document.getElementById('apiUrl');
+            apiUrlInput.addEventListener('input', function() {
                 currentApiUrl = this.value.replace(/\/$/, ''); // Remove trailing slash
             });
+
+            // Tab buttons
+            document.getElementById('single-tab-btn').addEventListener('click', function() {
+                switchTab('single');
+            });
+            
+            document.getElementById('batch-tab-btn').addEventListener('click', function() {
+                switchTab('batch');
+            });
+
+            // Validate buttons
+            document.getElementById('validateSingleBtn').addEventListener('click', validateSingle);
+            document.getElementById('validateBatchBtn').addEventListener('click', validateBatch);
+            document.getElementById('loadSampleBtn').addEventListener('click', loadSampleData);
+
+            // Enter key support for single email
+            document.getElementById('singleEmail').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    validateSingle();
+                }
+            });
+
+            // Real-time email count for batch
+            document.getElementById('batchEmails').addEventListener('input', updateEmailCount);
         }
 
         // Tab switching
         function switchTab(tabName) {
-            // Hide all tabs
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
+            // Remove active class from all tabs and content
             document.querySelectorAll('.tab').forEach(tab => {
                 tab.classList.remove('active');
             });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
 
-            // Show selected tab
+            // Add active class to selected tab and content
+            document.getElementById(tabName + '-tab-btn').classList.add('active');
             document.getElementById(tabName + '-tab').classList.add('active');
-            event.target.classList.add('active');
 
             // Clear previous results
             clearResults();
         }
 
-        // Clear all results
+        // Clear all results and errors
         function clearResults() {
-            const singleResult = document.getElementById('singleResult');
-            const batchResults = document.getElementById('batchResults');
-            const singleError = document.getElementById('singleError');
-            const batchError = document.getElementById('batchError');
-            
-            if (singleResult) singleResult.innerHTML = '';
-            if (batchResults) batchResults.innerHTML = '';
-            if (singleError) singleError.textContent = '';
-            if (batchError) batchError.textContent = '';
+            const elements = ['singleResult', 'batchResults', 'singleError', 'batchError'];
+            elements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.innerHTML = '';
+                }
+            });
+        }
+
+        // Update email count display
+        function updateEmailCount() {
+            const textarea = document.getElementById('batchEmails');
+            const label = document.querySelector('label[for="batchEmails"]');
+            const emails = textarea.value.split('\n').filter(email => email.trim().length > 0);
+            label.textContent = `Email Addresses (${emails.length} emails entered)`;
         }
 
         // Validate single email
         async function validateSingle() {
+            console.log('validateSingle called');
+            
             const emailInput = document.getElementById('singleEmail');
             const errorDiv = document.getElementById('singleError');
             const resultDiv = document.getElementById('singleResult');
             const loader = document.getElementById('singleLoader');
-
-            if (!emailInput || !resultDiv || !loader) {
-                console.error('Required elements not found');
-                return;
-            }
+            const button = document.getElementById('validateSingleBtn');
 
             const email = emailInput.value.trim();
 
             // Clear previous results
-            if (errorDiv) errorDiv.textContent = '';
+            errorDiv.textContent = '';
             resultDiv.innerHTML = '';
 
             // Validation
             if (!email) {
-                if (errorDiv) errorDiv.textContent = 'Please enter an email address';
+                errorDiv.textContent = 'Please enter an email address';
                 return;
             }
 
             if (!currentApiUrl) {
-                if (errorDiv) errorDiv.textContent = 'Please configure API URL';
+                errorDiv.textContent = 'Please configure API URL first';
                 return;
             }
 
             // Show loader
             loader.style.display = 'inline-block';
+            button.disabled = true;
 
             try {
                 const response = await fetch(`${currentApiUrl}/validate`, {
@@ -519,14 +576,13 @@
                 `;
             } finally {
                 loader.style.display = 'none';
+                button.disabled = false;
             }
         }
 
         // Display single email result
         function displaySingleResult(data) {
             const resultDiv = document.getElementById('singleResult');
-            if (!resultDiv) return;
-            
             const isValid = data.is_valid;
 
             let resultHTML = `
@@ -553,10 +609,15 @@
 
         // Validate batch emails
         async function validateBatch() {
-            const emailsText = document.getElementById('batchEmails').value.trim();
+            console.log('validateBatch called');
+            
+            const emailsTextarea = document.getElementById('batchEmails');
             const errorDiv = document.getElementById('batchError');
             const resultDiv = document.getElementById('batchResults');
             const loader = document.getElementById('batchLoader');
+            const button = document.getElementById('validateBatchBtn');
+
+            const emailsText = emailsTextarea.value.trim();
 
             // Clear previous results
             errorDiv.textContent = '';
@@ -569,7 +630,7 @@
             }
 
             if (!currentApiUrl) {
-                errorDiv.textContent = 'Please configure API URL';
+                errorDiv.textContent = 'Please configure API URL first';
                 return;
             }
 
@@ -596,6 +657,7 @@
 
             // Show loader
             loader.style.display = 'inline-block';
+            button.disabled = true;
 
             try {
                 const response = await fetch(`${currentApiUrl}/validate/batch`, {
@@ -624,6 +686,7 @@
                 `;
             } finally {
                 loader.style.display = 'none';
+                button.disabled = false;
             }
         }
 
@@ -685,7 +748,7 @@
             resultDiv.innerHTML = html;
         }
 
-        // Sample data generator for testing
+        // Load sample data for testing
         function loadSampleData() {
             const sampleEmails = [
                 'user@example.com',
@@ -721,40 +784,11 @@
             ];
 
             document.getElementById('batchEmails').value = sampleEmails.join('\n');
+            updateEmailCount();
         }
 
-        // Add sample data button
-        document.addEventListener('DOMContentLoaded', function() {
-            // Add sample data button to batch tab
-            const batchCard = document.querySelector('#batch-tab .card');
-            const sampleButton = document.createElement('button');
-            sampleButton.className = 'btn';
-            sampleButton.style.marginLeft = '10px';
-            sampleButton.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
-            sampleButton.innerHTML = '🎯 Load Sample Data';
-            sampleButton.onclick = loadSampleData;
-            
-            const validateButton = batchCard.querySelector('.btn');
-            validateButton.parentNode.insertBefore(sampleButton, validateButton.nextSibling);
-
-            // Auto-detect API URL from current domain in production
-            if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-                const apiUrlInput = document.getElementById('apiUrl');
-                apiUrlInput.value = `${window.location.protocol}//${window.location.host}`;
-                currentApiUrl = apiUrlInput.value;
-            }
-        });
-
-        // Enter key support
-        document.getElementById('singleEmail').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                validateSingle();
-            }
-        });
-
-        // Real-time email count for batch
-        document.getElementById('batchEmails').addEventListener('input', function() {
-            const emails = this.value.split('\n').filter(email => email.trim().length > 0);
-            const label = document.querySelector('label[for="batchEmails"]');
-            label.textContent = `Email Addresses (${emails.length} emails entered)`;
-        });
+        // Initialize the app when the page loads
+        document.addEventListener('DOMContentLoaded', initializeApp);
+    </script>
+</body>
+</html>
