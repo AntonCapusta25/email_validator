@@ -15,9 +15,10 @@ CORS(app)  # ADD THIS LINE - Enables CORS for all routes
 
 def validate_single_email(email):
     """
-    Validate a single email address
+    Validate a single email address with fallback
     """
     try:
+        # Try advanced validation first
         valid = validate_email(email)
         return {
             'email': email,
@@ -37,6 +38,78 @@ def validate_single_email(email):
             'is_valid': False,
             'normalized': None,
             'error': str(e)
+        }
+    except Exception as e:
+        # Fallback to simple validation if email-validator fails
+        print(f"Advanced validation failed for {email}: {e}")
+        return validate_email_simple(email)
+
+def validate_email_simple(email):
+    """
+    Simple email validation fallback (no external dependencies)
+    """
+    try:
+        if not email or not isinstance(email, str):
+            return {
+                'email': email,
+                'is_valid': False,
+                'error': 'Email must be a string'
+            }
+        
+        email = email.strip()
+        if not email:
+            return {
+                'email': email,
+                'is_valid': False,
+                'error': 'Email cannot be empty'
+            }
+        
+        if '@' not in email:
+            return {
+                'email': email,
+                'is_valid': False,
+                'error': 'Email must contain @ symbol'
+            }
+        
+        parts = email.split('@')
+        if len(parts) != 2:
+            return {
+                'email': email,
+                'is_valid': False,
+                'error': 'Email must have exactly one @ symbol'
+            }
+        
+        local, domain = parts
+        if not local or not domain:
+            return {
+                'email': email,
+                'is_valid': False,
+                'error': 'Email must have local and domain parts'
+            }
+        
+        if '.' not in domain:
+            return {
+                'email': email,
+                'is_valid': False,
+                'error': 'Domain must contain a period'
+            }
+        
+        # Basic validation passed
+        return {
+            'email': email,
+            'is_valid': True,
+            'normalized': email.lower(),
+            'local': local,
+            'domain': domain,
+            'error': None,
+            'method': 'simple_validation'
+        }
+        
+    except Exception as e:
+        return {
+            'email': email,
+            'is_valid': False,
+            'error': f'Validation error: {str(e)}'
         }
 
 def chunk_emails(emails: List[str], batch_size: int = 30):
@@ -66,9 +139,10 @@ def home():
         'message': 'Email Validator API',
         'version': '1.0',
         'endpoints': {
+            'GET /health': 'Health check',
+            'GET /test': 'Test endpoint for debugging',
             'POST /validate': 'Validate single email',
-            'POST /validate/batch': 'Validate multiple emails (minimum 30 for batch processing)',
-            'GET /health': 'Health check'
+            'POST /validate/batch': 'Validate multiple emails (minimum 30 for batch processing)'
         },
         'usage': {
             'single_email': {
@@ -92,24 +166,70 @@ def health():
     """Health check endpoint"""
     return jsonify({'status': 'healthy', 'service': 'email-validator'})
 
+@app.route('/test', methods=['GET'])
+def test_endpoint():
+    """Test endpoint to verify API is working"""
+    try:
+        # Test simple validation
+        test_result = validate_email_simple('test@example.com')
+        
+        # Test if email-validator library is available
+        try:
+            from email_validator import validate_email as ev_validate
+            ev_result = ev_validate('test@example.com')
+            library_status = 'available'
+        except ImportError:
+            library_status = 'not_available'
+        except Exception as e:
+            library_status = f'error: {str(e)}'
+        
+        return jsonify({
+            'status': 'test_successful',
+            'simple_validation': test_result,
+            'email_validator_library': library_status,
+            'message': 'API is working correctly'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'test_failed',
+            'error': str(e)
+        }), 500
+
 @app.route('/validate', methods=['POST'])
 def validate_email_endpoint():
     """Validate a single email address"""
     try:
+        # Debug: Print request info
+        print(f"Received request: {request.method} to /validate")
+        print(f"Content-Type: {request.content_type}")
+        
         data = request.get_json()
+        print(f"Request data: {data}")
         
         if not data or 'email' not in data:
             return jsonify({'error': 'Email address is required'}), 400
         
-        email = data['email'].strip()
+        email = data['email']
+        print(f"Processing email: {email}")
+        
+        if not email or not isinstance(email, str):
+            return jsonify({'error': 'Email must be a valid string'}), 400
+            
+        email = email.strip()
         if not email:
             return jsonify({'error': 'Email address cannot be empty'}), 400
         
         result = validate_single_email(email)
+        print(f"Validation result: {result}")
+        
         return jsonify(result)
         
     except Exception as e:
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+        error_msg = f'Internal server error: {str(e)}'
+        print(f"ERROR in validate endpoint: {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': error_msg}), 500
 
 @app.route('/validate/batch', methods=['POST'])
 def validate_batch_endpoint():
