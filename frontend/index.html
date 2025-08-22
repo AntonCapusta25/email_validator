@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Validator Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .api-config {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+
+        .api-config h3 {
+            margin-bottom: 15px;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .api-url-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .api-url-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .email-input, .batch-textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .batch-textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: monospace;
+        }
+
+        .email-input:focus, .batch-textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .result.success {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+        }
+
+        .result.error {
+            background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
+            color: white;
+        }
+
+        .result.info {
+            background: linear-gradient(135deg, #2196F3 0%, #0b7dda 100%);
+            color: white;
+        }
+
+        .batch-results {
+            margin-top: 20px;
+        }
+
+        .batch-summary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .batch-summary h3 {
+            margin-bottom: 10px;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .results-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e1e5e9;
+            border-radius: 15px;
+            background: #f8f9fa;
+        }
+
+        .result-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e1e5e9;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            transition: background 0.2s ease;
+        }
+
+        .result-item:hover {
+            background: #e9ecef;
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .result-email {
+            flex: 1;
+            font-family: monospace;
+            font-weight: 600;
+        }
+
+        .result-status {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-valid {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-invalid {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .tabs {
+            display: flex;
+            background: rgba(255,255,255,0.2);
+            border-radius: 15px;
+            padding: 5px;
+            margin-bottom: 30px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            background: transparent;
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .tab.active {
+            background: white;
+            color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .batch-info {
+            background: #e3f2fd;
+            border: 1px solid #2196F3;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .batch-info h4 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        .batch-info ul {
+            margin-left: 20px;
+            color: #555;
+        }
+
+        .error-message {
+            color: #f44336;
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+            
+            .summary-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📧 Email Validator Pro</h1>
+            <p>Professional email validation with batch processing</p>
+        </div>
+
+        <!-- API Configuration -->
+        <div class="api-config">
+            <h3>🔗 API Configuration</h3>
+            <input type="url" id="apiUrl" class="api-url-input" 
+                   placeholder="Enter your API URL (e.g., https://your-app.railway.app)" 
+                   value="https://emailvalidator-production-dde3.up.railway.app/">
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('single')">Single Email</button>
+            <button class="tab" onclick="switchTab('batch')">Batch Processing</button>
+        </div>
+
+        <!-- Single Email Tab -->
+        <div id="single-tab" class="tab-content active">
+            <div class="card">
+                <h2>✉️ Single Email Validation</h2>
+                <div class="input-group">
+                    <label for="singleEmail">Email Address</label>
+                    <input type="email" id="singleEmail" class="email-input" 
+                           placeholder="Enter email address to validate">
+                    <div id="singleError" class="error-message"></div>
+                </div>
+                <button class="btn" onclick="validateSingle()">
+                    <span id="singleLoader" class="loading" style="display: none;"></span>
+                    Validate Email
+                </button>
+                <div id="singleResult"></div>
+            </div>
+        </div>
+
+        <!-- Batch Email Tab -->
+        <div id="batch-tab" class="tab-content">
+            <div class="card">
+                <h2>📋 Batch Email Validation</h2>
+                
+                <div class="batch-info">
+                    <h4>📊 Batch Processing Info</h4>
+                    <ul>
+                        <li>Minimum 30 emails required for optimized batch processing</li>
+                        <li>Enter one email per line</li>
+                        <li>Duplicate emails will be automatically removed</li>
+                        <li>Invalid formats will be filtered out</li>
+                    </ul>
+                </div>
+
+                <div class="input-group">
+                    <label for="batchEmails">Email Addresses (one per line)</label>
+                    <textarea id="batchEmails" class="batch-textarea" 
+                              placeholder="email1@example.com&#10;email2@example.com&#10;email3@example.com&#10;..."></textarea>
+                    <div id="batchError" class="error-message"></div>
+                </div>
+                
+                <button class="btn" onclick="validateBatch()">
+                    <span id="batchLoader" class="loading" style="display: none;"></span>
+                    Validate Batch
+                </button>
+
+                <div id="batchResults" class="batch-results"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentApiUrl = 'http://localhost:5000';
+
+        // Update API URL when changed
+        document.getElementById('apiUrl').addEventListener('change', function() {
+            currentApiUrl = this.value.replace(/\/$/, ''); // Remove trailing slash
+        });
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+
+            // Clear previous results
+            clearResults();
+        }
+
+        // Clear all results
+        function clearResults() {
+            document.getElementById('singleResult').innerHTML = '';
+            document.getElementById('batchResults').innerHTML = '';
+            document.getElementById('singleError').textContent = '';
+            document.getElementById('batchError').textContent = '';
+        }
+
+        // Validate single email
+        async function validateSingle() {
+            const email = document.getElementById('singleEmail').value.trim();
+            const errorDiv = document.getElementById('singleError');
+            const resultDiv = document.getElementById('singleResult');
+            const loader = document.getElementById('singleLoader');
+
+            // Clear previous results
+            errorDiv.textContent = '';
+            resultDiv.innerHTML = '';
+
+            // Validation
+            if (!email) {
+                errorDiv.textContent = 'Please enter an email address';
+                return;
+            }
+
+            if (!currentApiUrl) {
+                errorDiv.textContent = 'Please configure API URL';
+                return;
+            }
+
+            // Show loader
+            loader.style.display = 'inline-block';
+
+            try {
+                const response = await fetch(`${currentApiUrl}/validate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email: email })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displaySingleResult(data);
+                } else {
+                    throw new Error(data.error || 'Validation failed');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <strong>❌ Error:</strong> ${error.message}
+                    </div>
+                `;
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+
+        // Display single email result
+        function displaySingleResult(data) {
+            const resultDiv = document.getElementById('singleResult');
+            const isValid = data.is_valid;
+
+            let resultHTML = `
+                <div class="result ${isValid ? 'success' : 'error'}">
+                    <h3>${isValid ? '✅ Valid Email' : '❌ Invalid Email'}</h3>
+                    <p><strong>Email:</strong> ${data.email}</p>
+            `;
+
+            if (isValid) {
+                resultHTML += `
+                    <p><strong>Normalized:</strong> ${data.normalized || data.email}</p>
+                    <p><strong>Local Part:</strong> ${data.local || 'N/A'}</p>
+                    <p><strong>Domain:</strong> ${data.domain || 'N/A'}</p>
+                `;
+            } else {
+                resultHTML += `
+                    <p><strong>Error:</strong> ${data.error}</p>
+                `;
+            }
+
+            resultHTML += '</div>';
+            resultDiv.innerHTML = resultHTML;
+        }
+
+        // Validate batch emails
+        async function validateBatch() {
+            const emailsText = document.getElementById('batchEmails').value.trim();
+            const errorDiv = document.getElementById('batchError');
+            const resultDiv = document.getElementById('batchResults');
+            const loader = document.getElementById('batchLoader');
+
+            // Clear previous results
+            errorDiv.textContent = '';
+            resultDiv.innerHTML = '';
+
+            // Parse emails
+            if (!emailsText) {
+                errorDiv.textContent = 'Please enter email addresses';
+                return;
+            }
+
+            if (!currentApiUrl) {
+                errorDiv.textContent = 'Please configure API URL';
+                return;
+            }
+
+            // Split emails and clean them
+            const emails = emailsText.split('\n')
+                .map(email => email.trim())
+                .filter(email => email.length > 0)
+                .filter((email, index, arr) => arr.indexOf(email) === index); // Remove duplicates
+
+            if (emails.length === 0) {
+                errorDiv.textContent = 'No valid email addresses found';
+                return;
+            }
+
+            // Show info about batch processing
+            if (emails.length < 30) {
+                resultDiv.innerHTML = `
+                    <div class="result info">
+                        <strong>ℹ️ Info:</strong> You entered ${emails.length} emails. 
+                        For optimized batch processing, 30+ emails are recommended, but validation will proceed normally.
+                    </div>
+                `;
+            }
+
+            // Show loader
+            loader.style.display = 'inline-block';
+
+            try {
+                const response = await fetch(`${currentApiUrl}/validate/batch`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        emails: emails,
+                        batch_size: Math.max(30, Math.min(50, emails.length))
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayBatchResults(data);
+                } else {
+                    throw new Error(data.error || 'Batch validation failed');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <strong>❌ Error:</strong> ${error.message}
+                    </div>
+                `;
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+
+        // Display batch results
+        function displayBatchResults(data) {
+            const resultDiv = document.getElementById('batchResults');
+            const summary = data.summary;
+            const results = data.results;
+
+            let html = `
+                <div class="batch-summary">
+                    <h3>📊 Validation Summary</h3>
+                    <div class="summary-stats">
+                        <div class="stat">
+                            <span class="stat-number">${summary.total}</span>
+                            <span class="stat-label">Total</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-number">${summary.valid}</span>
+                            <span class="stat-label">Valid</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-number">${summary.invalid}</span>
+                            <span class="stat-label">Invalid</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-number">${summary.success_rate}%</span>
+                            <span class="stat-label">Success Rate</span>
+                        </div>
+                    </div>
+            `;
+
+            if (summary.processed_in_batches) {
+                html += `
+                    <p style="margin-top: 15px; opacity: 0.9;">
+                        ⚡ Processed in batches of ${summary.batch_size_used} for optimal performance
+                    </p>
+                `;
+            }
+
+            html += '</div>';
+
+            // Results list
+            html += '<div class="results-list">';
+            
+            results.forEach(result => {
+                const isValid = result.is_valid;
+                html += `
+                    <div class="result-item">
+                        <div class="result-email">${result.email}</div>
+                        <div class="result-status ${isValid ? 'status-valid' : 'status-invalid'}">
+                            ${isValid ? '✓ Valid' : '✗ Invalid'}
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            resultDiv.innerHTML = html;
+        }
+
+        // Sample data generator for testing
+        function loadSampleData() {
+            const sampleEmails = [
+                'user@example.com',
+                'test@gmail.com',
+                'valid.email@domain.co.uk',
+                'another@company.org',
+                'user.name+tag@example.com',
+                'invalid.email',
+                'test@test',
+                'bad@',
+                '@invalid.com',
+                'spaces in@email.com',
+                'user@subdomain.domain.com',
+                'numeric123@example.com',
+                'hyphen-user@example.com',
+                'underscore_user@example.com',
+                'dots.in.name@example.com',
+                'plus+addressing@example.com',
+                'long.email.address@very-long-domain-name.example.com',
+                'short@a.co',
+                'unicode@münchen.de',
+                'test1@example.org',
+                'test2@example.net',
+                'test3@example.info',
+                'test4@example.biz',
+                'test5@example.name',
+                'test6@example.mobi',
+                'test7@example.travel',
+                'test8@example.museum',
+                'test9@example.coop',
+                'test10@example.aero',
+                'final@test.email'
+            ];
+
+            document.getElementById('batchEmails').value = sampleEmails.join('\n');
+        }
+
+        // Add sample data button
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add sample data button to batch tab
+            const batchCard = document.querySelector('#batch-tab .card');
+            const sampleButton = document.createElement('button');
+            sampleButton.className = 'btn';
+            sampleButton.style.marginLeft = '10px';
+            sampleButton.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+            sampleButton.innerHTML = '🎯 Load Sample Data';
+            sampleButton.onclick = loadSampleData;
+            
+            const validateButton = batchCard.querySelector('.btn');
+            validateButton.parentNode.insertBefore(sampleButton, validateButton.nextSibling);
+
+            // Auto-detect API URL from current domain in production
+            if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                const apiUrlInput = document.getElementById('apiUrl');
+                apiUrlInput.value = `${window.location.protocol}//${window.location.host}`;
+                currentApiUrl = apiUrlInput.value;
+            }
+        });
+
+        // Enter key support
+        document.getElementById('singleEmail').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                validateSingle();
+            }
+        });
+
+        // Real-time email count for batch
+        document.getElementById('batchEmails').addEventListener('input', function() {
+            const emails = this.value.split('\n').filter(email => email.trim().length > 0);
+            const label = document.querySelector('label[for="batchEmails"]');
+            label.textContent = `Email Addresses (${emails.length} emails entered)`;
+        });
