@@ -361,7 +361,7 @@
             <h3>🔗 API Configuration</h3>
             <input type="url" id="apiUrl" class="api-url-input" 
                    placeholder="Enter your API URL (e.g., https://your-app.railway.app)" 
-                   value="https://emailvalidator-production-dde3.up.railway.app/">
+                   value="https://emailvalidator-production-dde3.up.railway.app">
         </div>
 
         <!-- Tabs -->
@@ -422,12 +422,15 @@
 
     <script>
         // Global variables
-        let currentApiUrl = 'http://localhost:5000';
+        let currentApiUrl = window.location.origin || 'http://localhost:5000';
 
         // Update API URL when changed
-        document.getElementById('apiUrl').addEventListener('change', function() {
-            currentApiUrl = this.value.replace(/\/$/, ''); // Remove trailing slash
-        });
+        const apiUrlInput = document.getElementById('apiUrl');
+        if (apiUrlInput) {
+            apiUrlInput.addEventListener('change', function() {
+                currentApiUrl = this.value.replace(/\/$/, ''); // Remove trailing slash
+            });
+        }
 
         // Tab switching
         function switchTab(tabName) {
@@ -449,31 +452,43 @@
 
         // Clear all results
         function clearResults() {
-            document.getElementById('singleResult').innerHTML = '';
-            document.getElementById('batchResults').innerHTML = '';
-            document.getElementById('singleError').textContent = '';
-            document.getElementById('batchError').textContent = '';
+            const singleResult = document.getElementById('singleResult');
+            const batchResults = document.getElementById('batchResults');
+            const singleError = document.getElementById('singleError');
+            const batchError = document.getElementById('batchError');
+            
+            if (singleResult) singleResult.innerHTML = '';
+            if (batchResults) batchResults.innerHTML = '';
+            if (singleError) singleError.textContent = '';
+            if (batchError) batchError.textContent = '';
         }
 
         // Validate single email
         async function validateSingle() {
-            const email = document.getElementById('singleEmail').value.trim();
+            const emailInput = document.getElementById('singleEmail');
             const errorDiv = document.getElementById('singleError');
             const resultDiv = document.getElementById('singleResult');
             const loader = document.getElementById('singleLoader');
 
+            if (!emailInput || !resultDiv || !loader) {
+                console.error('Required elements not found');
+                return;
+            }
+
+            const email = emailInput.value.trim();
+
             // Clear previous results
-            errorDiv.textContent = '';
+            if (errorDiv) errorDiv.textContent = '';
             resultDiv.innerHTML = '';
 
             // Validation
             if (!email) {
-                errorDiv.textContent = 'Please enter an email address';
+                if (errorDiv) errorDiv.textContent = 'Please enter an email address';
                 return;
             }
 
             if (!currentApiUrl) {
-                errorDiv.textContent = 'Please configure API URL';
+                if (errorDiv) errorDiv.textContent = 'Please configure API URL';
                 return;
             }
 
@@ -510,6 +525,8 @@
         // Display single email result
         function displaySingleResult(data) {
             const resultDiv = document.getElementById('singleResult');
+            if (!resultDiv) return;
+            
             const isValid = data.is_valid;
 
             let resultHTML = `
