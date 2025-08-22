@@ -1,52 +1,29 @@
 #!/usr/bin/env python3
 """
-Web API Email Validator using Flask
-FIXED VERSION with CORS headers
+Email Validator API - FINAL FIXED VERSION
+- Proper CORS configuration
+- No DNS timeouts
+- Fast and reliable
 """
 
 from flask import Flask, request, jsonify
-from flask_cors import CORS  # ADD THIS LINE
-from email_validator import validate_email, EmailNotValidError
+from flask_cors import CORS
 import os
 from typing import List, Dict
+import re
 
 app = Flask(__name__)
-CORS(app)  # ADD THIS LINE - Enables CORS for all routes
 
-def validate_single_email(email):
-    """
-    Validate a single email address with fallback
-    """
-    try:
-        # Try advanced validation first
-        valid = validate_email(email)
-        return {
-            'email': email,
-            'is_valid': True,
-            'normalized': valid.email,
-            'local': valid.local,
-            'domain': valid.domain,
-            'ascii_email': valid.ascii_email,
-            'ascii_local': valid.ascii_local,
-            'ascii_domain': valid.ascii_domain,
-            'smtputf8': valid.smtputf8,
-            'error': None
-        }
-    except EmailNotValidError as e:
-        return {
-            'email': email,
-            'is_valid': False,
-            'normalized': None,
-            'error': str(e)
-        }
-    except Exception as e:
-        # Fallback to simple validation if email-validator fails
-        print(f"Advanced validation failed for {email}: {e}")
-        return validate_email_simple(email)
+# PROPER CORS Configuration - this fixes CORS issues completely
+CORS(app, 
+     origins=["*"],  # Allow all origins
+     methods=["GET", "POST", "OPTIONS"],  # Allow these methods
+     allow_headers=["Content-Type", "Authorization"],  # Allow these headers
+     supports_credentials=False)
 
 def validate_email_simple(email):
     """
-    Simple email validation fallback (no external dependencies)
+    Fast, reliable email validation without DNS lookups
     """
     try:
         if not email or not isinstance(email, str):
@@ -64,45 +41,43 @@ def validate_email_simple(email):
                 'error': 'Email cannot be empty'
             }
         
-        if '@' not in email:
+        # Enhanced regex pattern for email validation
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        
+        if not re.match(pattern, email):
             return {
                 'email': email,
                 'is_valid': False,
-                'error': 'Email must contain @ symbol'
+                'error': 'Invalid email format'
             }
         
-        parts = email.split('@')
-        if len(parts) != 2:
+        # Split email into parts
+        local, domain = email.split('@')
+        
+        # Additional validation
+        if len(local) > 64 or len(domain) > 253:
             return {
                 'email': email,
                 'is_valid': False,
-                'error': 'Email must have exactly one @ symbol'
+                'error': 'Email too long'
             }
         
-        local, domain = parts
-        if not local or not domain:
+        if local.startswith('.') or local.endswith('.') or '..' in local:
             return {
                 'email': email,
                 'is_valid': False,
-                'error': 'Email must have local and domain parts'
+                'error': 'Invalid local part format'
             }
         
-        if '.' not in domain:
-            return {
-                'email': email,
-                'is_valid': False,
-                'error': 'Domain must contain a period'
-            }
-        
-        # Basic validation passed
+        # Validation passed
         return {
             'email': email,
             'is_valid': True,
             'normalized': email.lower(),
             'local': local,
-            'domain': domain,
-            'error': None,
-            'method': 'simple_validation'
+            'domain': domain.lower(),
+            'method': 'regex_validation',
+            'error': None
         }
         
     except Exception as e:
@@ -112,21 +87,65 @@ def validate_email_simple(email):
             'error': f'Validation error: {str(e)}'
         }
 
-def chunk_emails(emails: List[str], batch_size: int = 30):
-    """Split email list into chunks"""
-    batch_size = max(batch_size, 30)
-    for i in range(0, len(emails), batch_size):
-        yield emails[i:i + batch_size]
+def validate_email_advanced(email):
+    """
+    Advanced validation with NO DNS lookups to prevent timeouts
+    """
+    try:
+        from email_validator import validate_email, EmailNotValidError
+        
+        # IMPORTANT: Disable deliverability checking to prevent DNS timeouts
+        valid = validate_email(email, check_deliverability=False)
+        
+        return {
+            'email': email,
+            'is_valid': True,
+            'normalized': valid.email,
+            'local': valid.local,
+            'domain': valid.domain,
+            'ascii_email': getattr(valid, 'ascii_email', valid.email),
+            'ascii_local': getattr(valid, 'ascii_local', valid.local),
+            'ascii_domain': getattr(valid, 'ascii_domain', valid.domain),
+            'smtputf8': getattr(valid, 'smtputf8', False),
+            'method': 'email_validator_library',
+            'error': None
+        }
+    except EmailNotValidError as e:
+        return {
+            'email': email,
+            'is_valid': False,
+            'normalized': None,
+            'method': 'email_validator_library',
+            'error': str(e)
+        }
+    except ImportError:
+        # Library not available, fall back to simple validation
+        return validate_email_simple(email)
+    except Exception as e:
+        # Any other error, fall back to simple validation
+        print(f"Advanced validation failed for {email}: {e}")
+        return validate_email_simple(email)
+
+def validate_single_email(email):
+    """
+    Main validation function with fallback
+    """
+    # Try advanced validation first (without DNS), fallback to simple
+    return validate_email_advanced(email)
 
 def validate_email_batches(emails: List[str], batch_size: int = 30) -> List[Dict]:
-    """Validate emails in batches"""
+    """
+    Fast batch validation without timeouts
+    """
     if not emails:
         return []
     
     batch_size = max(batch_size, 30)
     all_results = []
     
-    for batch in chunk_emails(emails, batch_size):
+    # Process in chunks to avoid overwhelming the system
+    for i in range(0, len(emails), batch_size):
+        batch = emails[i:i + batch_size]
         batch_results = [validate_single_email(email) for email in batch]
         all_results.extend(batch_results)
     
@@ -137,13 +156,21 @@ def home():
     """API documentation"""
     return jsonify({
         'message': 'Email Validator API',
-        'version': '1.0',
+        'version': '2.0',
+        'status': 'running',
         'endpoints': {
+            'GET /': 'API documentation',
             'GET /health': 'Health check',
-            'GET /test': 'Test endpoint for debugging',
+            'GET /test': 'Test endpoint',
             'POST /validate': 'Validate single email',
-            'POST /validate/batch': 'Validate multiple emails (minimum 30 for batch processing)'
+            'POST /validate/batch': 'Validate multiple emails'
         },
+        'features': [
+            'Fast validation without DNS timeouts',
+            'CORS enabled for all origins',
+            'Batch processing optimized for 30+ emails',
+            'Fallback validation system'
+        ],
         'usage': {
             'single_email': {
                 'url': '/validate',
@@ -164,30 +191,31 @@ def home():
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint"""
-    return jsonify({'status': 'healthy', 'service': 'email-validator'})
+    return jsonify({
+        'status': 'healthy', 
+        'service': 'email-validator',
+        'version': '2.0',
+        'features': 'fast_validation_no_dns'
+    })
 
 @app.route('/test', methods=['GET'])
 def test_endpoint():
-    """Test endpoint to verify API is working"""
+    """Test endpoint to verify everything is working"""
     try:
         # Test simple validation
-        test_result = validate_email_simple('test@example.com')
+        test_emails = ['test@example.com', 'invalid.email', 'user@domain.co.uk']
+        results = []
         
-        # Test if email-validator library is available
-        try:
-            from email_validator import validate_email as ev_validate
-            ev_result = ev_validate('test@example.com')
-            library_status = 'available'
-        except ImportError:
-            library_status = 'not_available'
-        except Exception as e:
-            library_status = f'error: {str(e)}'
+        for email in test_emails:
+            result = validate_single_email(email)
+            results.append(result)
         
         return jsonify({
             'status': 'test_successful',
-            'simple_validation': test_result,
-            'email_validator_library': library_status,
-            'message': 'API is working correctly'
+            'test_results': results,
+            'cors_enabled': True,
+            'dns_timeouts_disabled': True,
+            'message': 'API is working perfectly'
         })
     except Exception as e:
         return jsonify({
@@ -195,22 +223,20 @@ def test_endpoint():
             'error': str(e)
         }), 500
 
-@app.route('/validate', methods=['POST'])
+@app.route('/validate', methods=['POST', 'OPTIONS'])
 def validate_email_endpoint():
     """Validate a single email address"""
+    # Handle preflight OPTIONS request
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'})
+    
     try:
-        # Debug: Print request info
-        print(f"Received request: {request.method} to /validate")
-        print(f"Content-Type: {request.content_type}")
-        
         data = request.get_json()
-        print(f"Request data: {data}")
         
         if not data or 'email' not in data:
             return jsonify({'error': 'Email address is required'}), 400
         
         email = data['email']
-        print(f"Processing email: {email}")
         
         if not email or not isinstance(email, str):
             return jsonify({'error': 'Email must be a valid string'}), 400
@@ -220,20 +246,18 @@ def validate_email_endpoint():
             return jsonify({'error': 'Email address cannot be empty'}), 400
         
         result = validate_single_email(email)
-        print(f"Validation result: {result}")
-        
         return jsonify(result)
         
     except Exception as e:
-        error_msg = f'Internal server error: {str(e)}'
-        print(f"ERROR in validate endpoint: {error_msg}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': error_msg}), 500
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
-@app.route('/validate/batch', methods=['POST'])
+@app.route('/validate/batch', methods=['POST', 'OPTIONS'])
 def validate_batch_endpoint():
-    """Validate multiple email addresses"""
+    """Validate multiple email addresses quickly"""
+    # Handle preflight OPTIONS request
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'})
+    
     try:
         data = request.get_json()
         
@@ -250,15 +274,21 @@ def validate_batch_endpoint():
             return jsonify({'error': 'At least one email is required'}), 400
         
         # Clean emails
-        emails = [email.strip() for email in emails if email.strip()]
+        cleaned_emails = []
+        for email in emails:
+            if isinstance(email, str) and email.strip():
+                cleaned_emails.append(email.strip())
         
-        if len(emails) >= 30:
-            results = validate_email_batches(emails, batch_size)
+        if not cleaned_emails:
+            return jsonify({'error': 'No valid emails found'}), 400
+        
+        # Fast validation without DNS timeouts
+        if len(cleaned_emails) >= 30:
+            results = validate_email_batches(cleaned_emails, batch_size)
         else:
-            # For smaller batches, use regular processing
-            results = [validate_single_email(email) for email in emails]
+            results = [validate_single_email(email) for email in cleaned_emails]
         
-        # Summary statistics
+        # Calculate summary
         valid_count = sum(1 for r in results if r['is_valid'])
         invalid_count = len(results) - valid_count
         
@@ -269,14 +299,16 @@ def validate_batch_endpoint():
                 'valid': valid_count,
                 'invalid': invalid_count,
                 'success_rate': round((valid_count / len(results)) * 100, 2) if results else 0,
-                'processed_in_batches': len(emails) >= 30,
-                'batch_size_used': batch_size if len(emails) >= 30 else 'N/A'
+                'processed_in_batches': len(cleaned_emails) >= 30,
+                'batch_size_used': batch_size if len(cleaned_emails) >= 30 else 'N/A',
+                'processing_method': 'fast_no_dns'
             }
         })
         
     except Exception as e:
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
+# Error handlers
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({'error': 'Endpoint not found'}), 404
@@ -285,7 +317,16 @@ def not_found(error):
 def method_not_allowed(error):
     return jsonify({'error': 'Method not allowed'}), 405
 
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'error': 'Internal server error'}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('DEBUG', 'False').lower() == 'true'
+    
+    print(f"🚀 Starting Email Validator API v2.0 on port {port}")
+    print(f"✅ Features: Fast validation, CORS enabled, No DNS timeouts")
+    print(f"📡 Endpoints: /, /health, /test, /validate, /validate/batch")
+    
     app.run(host='0.0.0.0', port=port, debug=debug)
